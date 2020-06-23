@@ -56,16 +56,22 @@ const int line_num_width = 75;
 
 // Syntax highlighting stuff...
 #define TS 14 // default editor textsize
+#define BG        Fl_Text_Display::ATTR_BACKGROUND
+#define BG_EOL    BG | Fl_Text_Display::ATTR_BACKGROUND_EOL
+#define UNDER     Fl_Text_Display::ATTR_UNDERLINE
+#define STRIKE    Fl_Text_Display::ATTR_STRIKETHROUGH
+#define BG_COMMENT    (fl_rgb_color(255, 255, 190))
+#define BG_DIRECTIVE  (fl_lighter(FL_LIGHT1))
 Fl_Text_Buffer     *stylebuf = 0;
 Fl_Text_Display::Style_Table_Entry
                    styletable[] = {	// Style table
-		     { FL_BLACK,      FL_COURIER,           TS }, // A - Plain
-		     { FL_DARK_GREEN, FL_HELVETICA_ITALIC,  TS }, // B - Line comments
-		     { FL_DARK_GREEN, FL_HELVETICA_ITALIC,  TS }, // C - Block comments
-		     { FL_BLUE,       FL_COURIER,           TS }, // D - Strings
-		     { FL_DARK_RED,   FL_COURIER,           TS }, // E - Directives
-		     { FL_DARK_RED,   FL_COURIER_BOLD,      TS }, // F - Types
-		     { FL_BLUE,       FL_COURIER_BOLD,      TS }, // G - Keywords
+		     { FL_BLACK,      FL_COURIER,           TS },                     // A - Plain
+		     { FL_DARK_GREEN, FL_HELVETICA_ITALIC,  TS, BG_EOL, BG_COMMENT }, // B - Line comments
+		     { FL_DARK_GREEN, FL_HELVETICA_ITALIC,  TS, BG_EOL, BG_COMMENT }, // C - Block comments
+		     { FL_BLUE,       FL_COURIER,           TS, STRIKE },             // D - Strings
+		     { FL_DARK_RED,   FL_COURIER,           TS, BG, BG_DIRECTIVE },   // E - Directives
+		     { FL_DARK_RED,   FL_COURIER_BOLD,      TS, UNDER },              // F - Types
+		     { FL_BLUE,       FL_COURIER_BOLD,      TS },                     // G - Keywords
 		   };
 const char         *code_keywords[] = {	// List of known C/C++ keywords...
 		     "and",

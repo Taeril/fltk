@@ -2295,6 +2295,8 @@ void Fl_Text_Display::draw_string(int style,
     } else if (style & HIGHLIGHT_MASK) {
       if (Fl::focus() == (Fl_Widget*)this) background = fl_color_average(color(), selection_color(), 0.5f);
       else background = fl_color_average(color(), selection_color(), 0.6f);
+    } else if (styleRec->attr & ATTR_BACKGROUND) {
+      background = styleRec->bgcolor;
     } else background = color();
     foreground = (style & PRIMARY_MASK) ? fl_contrast(styleRec->color, background) : styleRec->color;
   } else if (style & PRIMARY_MASK) {
@@ -2327,9 +2329,27 @@ void Fl_Text_Display::draw_string(int style,
     static int can_leak = Fl::screen_driver()->text_display_can_leak();
     if (can_leak) fl_push_clip(X, Y, toX - X, mMaxsize);
     fl_draw( string, nChars, X, Y + mMaxsize - fl_descent());
-    if (Fl::screen_driver()->has_marked_text() && Fl::compose_state && (style & PRIMARY_MASK)) {
-      fl_color( fl_color_average(foreground, background, 0.6f) );
-      fl_line(X, Y + mMaxsize - 1, X + (int)fl_width(string, nChars), Y + mMaxsize - 1);
+
+    bool compose = Fl::screen_driver()->has_marked_text() && Fl::compose_state && (style & PRIMARY_MASK);
+    int attr = style & STYLE_LOOKUP_MASK ? styleRec->attr : 0;
+    bool underline = attr & ATTR_UNDERLINE;
+    bool strikethrough = attr & ATTR_STRIKETHROUGH;
+    if (compose || underline || strikethrough) {
+      int XX = X + (int)fl_width(string, nChars);
+
+      if (strikethrough) {
+        int YY = Y + mMaxsize - ((fl_height()/2));
+        fl_line(X, YY, XX, YY);
+      }
+
+      if (compose) {
+        int YY = Y + mMaxsize - 1;
+        fl_color( fl_color_average(foreground, background, 0.6f) );
+        fl_line(X, YY, XX, YY);
+      } else if (underline) {
+        int YY = Y + mMaxsize - 1;
+        fl_line(X, YY, XX, YY);
+      }
     }
     if (can_leak) fl_pop_clip();
   }
@@ -2506,14 +2526,23 @@ int Fl_Text_Display::position_style( int lineStartPos, int lineLen, int lineInde
 
   pos = lineStartPos + min( lineIndex, lineLen );
 
-  if ( lineIndex >= lineLen )
+  if ( lineIndex > lineLen ) {
     style = FILL_MASK;
-  else if ( styleBuf != NULL ) {
+  } else if ( styleBuf != NULL ) {
     style = ( unsigned char ) styleBuf->byte_at( pos );
     if (style == mUnfinishedStyle && mUnfinishedHighlightCB) {
       /* encountered "unfinished" style, trigger parsing */
       (mUnfinishedHighlightCB)( pos, mHighlightCBArg);
       style = (unsigned char) styleBuf->byte_at( pos);
+    } else if (lineIndex == lineLen && style & STYLE_LOOKUP_MASK) {
+      int si = (style & STYLE_LOOKUP_MASK) - 'A';
+      if (si < 0) si = 0;
+      else if (si >= mNStyles) si = mNStyles - 1;
+
+      const Style_Table_Entry * styleRec = mStyleTable + si;
+      if(!(styleRec->attr & ATTR_BACKGROUND_EOL)) {
+        style = FILL_MASK;
+      }
     }
   }
   if (buf->primary_selection()->includes(pos))

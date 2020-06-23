@@ -25,11 +25,11 @@
 #define FL_TEXT_DISPLAY_H
 
 #include <FL/Fl.H>		// Fl::scrollbar_size()
-#include "fl_draw.H"
-#include "Fl_Group.H"
-#include "Fl_Widget.H"
-#include "Fl_Scrollbar.H"
-#include "Fl_Text_Buffer.H"
+#include <FL/fl_draw.H>
+#include <FL/Fl_Group.H>
+#include <FL/Fl_Widget.H>
+#include <FL/Fl_Scrollbar.H>
+#include <FL/Fl_Text_Buffer.H>
 
 /**
  \brief Rich text display widget.
@@ -125,6 +125,17 @@ public:
     WRAP_AT_PIXEL,  /**< wrap text at a pixel position */
     WRAP_AT_BOUNDS  /**< wrap text so that it fits into the widget width */
   };    
+
+  /**
+   Style table attributes
+   */
+  enum {
+    ATTR_NONE           = 0,      /**< no attributes */
+    ATTR_BACKGROUND     = 1 << 0, /**< have backround set */
+    ATTR_BACKGROUND_EOL = 1 << 1, /**< fill background color till end of line*/
+    ATTR_UNDERLINE      = 1 << 2, /**< draw line under text */
+    ATTR_STRIKETHROUGH  = 1 << 3, /**< draw line through text */
+  };
   
   friend void fl_text_drag_me(int pos, Fl_Text_Display* d);
   
@@ -144,10 +155,11 @@ public:
    \see Fl_Text_Display::highlight_data()
    */
   struct Style_Table_Entry {
-    Fl_Color    color;	///< text color
-    Fl_Font     font;	///< text font
-    Fl_Fontsize size;	///< text font size
-    unsigned    attr;	///< currently unused (this may be changed in the future)
+    Fl_Color    color;   ///< text color
+    Fl_Font     font;    ///< text font
+    Fl_Fontsize size;    ///< text font size
+    unsigned    attr;    ///< text attributes
+    Fl_Color    bgcolor; ///< text background (need to set ATTR_BACKGROUND in attr)
   };
   
   Fl_Text_Display(int X, int Y, int W, int H, const char *l = 0);
