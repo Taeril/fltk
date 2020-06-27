@@ -409,7 +409,10 @@ enum Fl_Event {	// events
   /** A zoom event (ctrl/+/-/0/ or cmd/+/-/0/) was processed.
    Use Fl::add_handler() to be notified of this event.
    */
-  FL_ZOOM_EVENT = 27
+  FL_ZOOM_EVENT = 27,
+  /** User event for use in custom widgets.
+   */
+  FL_USER_EVENT = 28
 // DEV NOTE: Keep this list in sync with FL/names.h
 };
 

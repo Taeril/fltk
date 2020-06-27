@@ -62,17 +62,93 @@ const int line_num_width = 75;
 #define STRIKE    Fl_Text_Display::ATTR_STRIKETHROUGH
 #define BG_COMMENT    (fl_rgb_color(255, 255, 190))
 #define BG_DIRECTIVE  (fl_lighter(FL_LIGHT1))
+#define RGB(hex) (fl_rgb_color((hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff))
 Fl_Text_Buffer     *stylebuf = 0;
-Fl_Text_Display::Style_Table_Entry
-                   styletable[] = {	// Style table
-		     { FL_BLACK,      FL_COURIER,           TS },                     // A - Plain
-		     { FL_DARK_GREEN, FL_HELVETICA_ITALIC,  TS, BG_EOL, BG_COMMENT }, // B - Line comments
-		     { FL_DARK_GREEN, FL_HELVETICA_ITALIC,  TS, BG_EOL, BG_COMMENT }, // C - Block comments
-		     { FL_BLUE,       FL_COURIER,           TS, STRIKE },             // D - Strings
-		     { FL_DARK_RED,   FL_COURIER,           TS, BG, BG_DIRECTIVE },   // E - Directives
-		     { FL_DARK_RED,   FL_COURIER_BOLD,      TS, UNDER },              // F - Types
-		     { FL_BLUE,       FL_COURIER_BOLD,      TS },                     // G - Keywords
-		   };
+
+// Style table
+#define STYLE_TABLE_SIZE 7
+Fl_Text_Display::Style_Table_Entry styletable[STYLE_TABLE_SIZE];
+Fl_Text_Display::Style_Table_Entry* current_style;
+int current_style_index;
+
+Fl_Text_Display::Style_Table_Entry style_none[] = {
+  { FL_BLACK, FL_COURIER, TS }, // A - Plain
+  { 0 } // END
+};
+
+Fl_Text_Display::Style_Table_Entry style_default[] = {
+  { FL_BLACK,      FL_COURIER,           TS },                        // A - Plain
+  { FL_DARK_GREEN, FL_HELVETICA_ITALIC,  TS, BG_EOL, RGB(0xFFFFBE) }, // B - Line comments
+  { FL_DARK_GREEN, FL_HELVETICA_ITALIC,  TS, BG_EOL, BG_COMMENT },    // C - Block comments
+  { FL_BLUE,       FL_COURIER,           TS, STRIKE },                // D - Strings
+  { FL_DARK_RED,   FL_COURIER,           TS, BG, BG_DIRECTIVE },      // E - Directives
+  { FL_DARK_RED,   FL_COURIER_BOLD,      TS, UNDER },                 // F - Types
+  { FL_BLUE,       FL_COURIER_BOLD,      TS },                        // G - Keywords
+  { 0 } // END
+};
+
+Fl_Text_Display::Style_Table_Entry style_fltk[] = {
+  { FL_BLACK,      FL_COURIER,           TS }, // A - Plain
+  { FL_DARK_GREEN, FL_HELVETICA_ITALIC,  TS }, // B - Line comments
+  { FL_DARK_GREEN, FL_HELVETICA_ITALIC,  TS }, // C - Block comments
+  { FL_BLUE,       FL_COURIER,           TS }, // D - Strings
+  { FL_DARK_RED,   FL_COURIER,           TS }, // E - Directives
+  { FL_DARK_RED,   FL_COURIER_BOLD,      TS }, // F - Types
+  { FL_BLUE,       FL_COURIER_BOLD,      TS }, // G - Keywords
+  { 0 } // END
+};
+
+Fl_Text_Display::Style_Table_Entry style_dark[] = {
+  { RGB(0xF8F8F2), FL_COURIER,           TS, BG, RGB(0x272822) }, // A - Plain
+  { RGB(0xE6DB74), FL_HELVETICA_ITALIC,  TS },                    // B - Line comments
+  { RGB(0xE6DB74), FL_HELVETICA_ITALIC,  TS },                    // C - Block comments
+  { RGB(0xFF80FF), FL_COURIER,           TS },                    // D - Strings
+  { RGB(0xA6E22E), FL_COURIER,           TS },                    // E - Directives
+  { RGB(0xFD971F), FL_COURIER_BOLD,      TS },                    // F - Types
+  { RGB(0xF92672), FL_COURIER_BOLD,      TS },                    // G - Keywords
+  { 0 } // END
+};
+
+struct EditorStyles {
+  const char* name;
+  Fl_Text_Display::Style_Table_Entry* style;
+} editor_styles[] = {
+  { "None",    style_none },
+  { "Default", style_default },
+  { "FLTK",    style_fltk },
+  { "Dark",    style_dark },
+  { 0 }
+};
+
+static void set_styletable(Fl_Widget* w, void* v) {
+  Fl_Menu_Bar* m = (Fl_Menu_Bar*)w;
+  Fl_Text_Display::Style_Table_Entry* e = v ?
+    (Fl_Text_Display::Style_Table_Entry*)v : style_default;
+  Fl_Text_Display::Style_Table_Entry* p = e;
+  current_style = e;
+  if(m) current_style_index = m->value();
+  int i = 0;
+  while (i < 7 && p->size != 0) {
+    styletable[i] = *p;
+    ++i;
+    ++p;
+  }
+  if (i == 0) {
+    styletable[0] = { FL_BLACK, FL_COURIER, TS };
+    ++i;
+  }
+  while (i < 7) {
+    styletable[i]   = styletable[0];
+    ++i;
+  }
+
+  Fl_Window* win = Fl::first_window();
+  while(win) {
+    win->handle(FL_USER_EVENT);
+    win = Fl::next_window(win);
+  }
+}
+
 const char         *code_keywords[] = {	// List of known C/C++ keywords...
 		     "and",
 		     "and_eq",
@@ -455,6 +531,10 @@ class EditorWindow : public Fl_Double_Window {
 
     Fl_Text_Editor     *editor;
     char               search[256];
+
+    Fl_Menu_Bar        *menu_bar;
+
+    int handle(int event);
 };
 
 EditorWindow::EditorWindow(int w, int h, const char* t) : Fl_Double_Window(w, h, t) {
@@ -484,6 +564,22 @@ EditorWindow::EditorWindow(int w, int h, const char* t) : Fl_Double_Window(w, h,
 EditorWindow::~EditorWindow() {
   delete replace_dlg;
 }
+
+int EditorWindow::handle(int event) {
+  if(event == FL_USER_EVENT) {
+    if(styletable[0].attr & BG) {
+      editor->color(styletable[0].bgcolor);
+    } else {
+      //editor->color(FL_WHITE);
+      editor->color(FL_BACKGROUND2_COLOR, FL_SELECTION_COLOR);
+    }
+    menu_bar->setonly((Fl_Menu_Item*)menu_bar->menu() + current_style_index);
+    editor->redraw();
+    return 1;
+  }
+  return Fl_Double_Window::handle(event);
+}
+
 
 #ifdef DEV_TEST
 
@@ -881,6 +977,8 @@ Fl_Menu_Item menuitems[] = {
     { "Preferences",      0, 0, 0, FL_SUBMENU },
       { "Line Numbers",   FL_COMMAND + 'l', (Fl_Callback *)linenumbers_cb, 0, FL_MENU_TOGGLE },
       { "Word Wrap",      0,                (Fl_Callback *)wordwrap_cb, 0, FL_MENU_TOGGLE },
+      { "Highlight Style", 0, 0, 0, FL_SUBMENU },
+        { 0 },
       { 0 },
     { 0 },
 
@@ -902,15 +1000,29 @@ Fl_Window* new_view() {
 #endif // DEV_TEST
 
     w->begin();
-    Fl_Menu_Bar* m = new Fl_Menu_Bar(0, 0, 660, 30);
+    w->menu_bar = new Fl_Menu_Bar(0, 0, 660, 30);
+    Fl_Menu_Bar* m = w->menu_bar;
     m->copy(menuitems, w);
+
+    EditorStyles* es = editor_styles;
+    int midx = m->find_index("&Edit/Preferences/Highlight Style");
+    while(es->name) {
+      ++midx;
+      if(es->style == current_style) {
+        m->insert(midx, es->name, 0, set_styletable, es->style, FL_MENU_RADIO | FL_MENU_VALUE);
+        current_style_index = midx;
+      } else {
+        m->insert(midx, es->name, 0, set_styletable, es->style, FL_MENU_RADIO);
+      }
+      ++es;
+    }
+
     w->editor = new Fl_Text_Editor(0, 30, 660, 370);
     w->editor->textfont(FL_COURIER);
     w->editor->textsize(TS);
   //w->editor->wrap_mode(Fl_Text_Editor::WRAP_AT_BOUNDS, 250);
     w->editor->buffer(textbuf);
-    w->editor->highlight_data(stylebuf, styletable,
-                              sizeof(styletable) / sizeof(styletable[0]),
+    w->editor->highlight_data(stylebuf, styletable, STYLE_TABLE_SIZE,
 			      'A', style_unfinished_cb, 0);
 
 #ifdef DEV_TEST
@@ -963,6 +1075,7 @@ int main(int argc, char **argv) {
   textbuf = new Fl_Text_Buffer;
 //textbuf->transcoding_warning_action = NULL;
   style_init();
+  set_styletable(0, 0); // initialize styletable
   fl_open_callback(cb);
 
   Fl_Window* window = new_view();
