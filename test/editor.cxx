@@ -69,7 +69,7 @@ Fl_Text_Buffer     *stylebuf = 0;
 #define STYLE_TABLE_SIZE 7
 Fl_Text_Display::Style_Table_Entry styletable[STYLE_TABLE_SIZE];
 Fl_Text_Display::Style_Table_Entry* current_style;
-int current_style_index;
+int current_style_index = 0;
 
 Fl_Text_Display::Style_Table_Entry style_none[] = {
   { FL_BLACK, FL_COURIER, TS }, // A - Plain
@@ -107,17 +107,6 @@ Fl_Text_Display::Style_Table_Entry style_dark[] = {
   { RGB(0xFD971F), FL_COURIER_BOLD,      TS },                    // F - Types
   { RGB(0xF92672), FL_COURIER_BOLD,      TS },                    // G - Keywords
   { 0 } // END
-};
-
-struct EditorStyles {
-  const char* name;
-  Fl_Text_Display::Style_Table_Entry* style;
-} editor_styles[] = {
-  { "None",    style_none },
-  { "Default", style_default },
-  { "FLTK",    style_fltk },
-  { "Dark",    style_dark },
-  { 0 }
 };
 
 static void set_styletable(Fl_Widget* w, void* v) {
@@ -978,6 +967,10 @@ Fl_Menu_Item menuitems[] = {
       { "Line Numbers",   FL_COMMAND + 'l', (Fl_Callback *)linenumbers_cb, 0, FL_MENU_TOGGLE },
       { "Word Wrap",      0,                (Fl_Callback *)wordwrap_cb, 0, FL_MENU_TOGGLE },
       { "Highlight Style", 0, 0, 0, FL_SUBMENU },
+        { "None",    0, set_styletable, 0, FL_MENU_RADIO },
+        { "Default", 0, set_styletable, 0, FL_MENU_RADIO },
+        { "FLTK",    0, set_styletable, 0, FL_MENU_RADIO },
+        { "Dark",    0, set_styletable, 0, FL_MENU_RADIO },
         { 0 },
       { 0 },
     { 0 },
@@ -1004,18 +997,13 @@ Fl_Window* new_view() {
     Fl_Menu_Bar* m = w->menu_bar;
     m->copy(menuitems, w);
 
-    EditorStyles* es = editor_styles;
     int midx = m->find_index("&Edit/Preferences/Highlight Style");
-    while(es->name) {
-      ++midx;
-      if(es->style == current_style) {
-        m->insert(midx, es->name, 0, set_styletable, es->style, FL_MENU_RADIO | FL_MENU_VALUE);
-        current_style_index = midx;
-      } else {
-        m->insert(midx, es->name, 0, set_styletable, es->style, FL_MENU_RADIO);
-      }
-      ++es;
-    }
+    Fl_Menu_Item* hs = (Fl_Menu_Item*)m->menu() + midx;
+    (hs + 1)->user_data(style_none);
+    (hs + 2)->user_data(style_default);
+    (hs + 3)->user_data(style_fltk);
+    (hs + 4)->user_data(style_dark);
+    if(!current_style_index) current_style_index = midx + 2;
 
     w->editor = new Fl_Text_Editor(0, 30, 660, 370);
     w->editor->textfont(FL_COURIER);
@@ -1024,6 +1012,8 @@ Fl_Window* new_view() {
     w->editor->buffer(textbuf);
     w->editor->highlight_data(stylebuf, styletable, STYLE_TABLE_SIZE,
 			      'A', style_unfinished_cb, 0);
+
+    w->handle(FL_USER_EVENT);
 
 #ifdef DEV_TEST
 
